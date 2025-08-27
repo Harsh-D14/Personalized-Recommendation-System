@@ -1,0 +1,149 @@
+# Makefile for InstaCart Recommendation System
+
+.PHONY: help install clean test train app eda setup all
+
+# Variables
+PYTHON := python3
+PIP := pip3
+DATA_DIR := data/raw
+MODEL_DIR := data/models
+
+# Default target
+help:
+	@echo "InstaCart Recommendation System - Available Commands:"
+	@echo "======================================================"
+	@echo "  make setup       - Create directory structure"
+	@echo "  make install     - Install dependencies"
+	@echo "  make eda         - Run exploratory data analysis"
+	@echo "  make train       - Train all models"
+	@echo "  make test        - Run unit tests"
+	@echo "  make app         - Launch Streamlit app"
+	@echo "  make clean       - Clean generated files"
+	@echo "  make all         - Setup, install, and train"
+	@echo ""
+	@echo "Model Training Options:"
+	@echo "  make train-small  - Train with 5000 users"
+	@echo "  make train-medium - Train with 10000 users"
+	@echo "  make train-large  - Train with 20000 users"
+	@echo ""
+	@echo "Recommendation Generation:"
+	@echo "  make recommend    - Generate sample recommendations"
+
+# Setup project structure
+setup:
+	@echo "Setting up project structure..."
+	@mkdir -p data/raw data/processed data/models
+	@mkdir -p plots logs tests/data
+	@touch data/raw/.gitkeep data/processed/.gitkeep data/models/.gitkeep
+	@echo "✅ Project structure created"
+
+# Install dependencies
+install:
+	@echo "Installing dependencies..."
+	$(PIP) install -r requirements.txt
+	@echo "✅ Dependencies installed"
+
+# Run EDA
+eda:
+	@echo "Running Exploratory Data Analysis..."
+	$(PYTHON) scripts/run_eda.py
+	@echo "✅ EDA completed"
+
+# Train models with default settings
+train:
+	@echo "Training models with default settings (10000 users)..."
+	$(PYTHON) scripts/train_models.py --sample-size 10000
+	@echo "✅ Models trained"
+
+# Train with different sample sizes
+train-small:
+	@echo "Training models with 5000 users..."
+	$(PYTHON) scripts/train_models.py --sample-size 5000
+
+train-medium:
+	@echo "Training models with 10000 users..."
+	$(PYTHON) scripts/train_models.py --sample-size 10000
+
+train-large:
+	@echo "Training models with 20000 users..."
+	$(PYTHON) scripts/train_models.py --sample-size 20000
+
+# Generate recommendations
+recommend:
+	@echo "Generating sample recommendations..."
+	$(PYTHON) scripts/generate_recommendations.py --model item_cf --n-recommendations 10
+
+# Run tests
+test:
+	@echo "Running unit tests..."
+	$(PYTHON) -m pytest tests/ -v --cov=src --cov-report=term-missing
+	@echo "✅ Tests completed"
+
+# Launch Streamlit app
+app:
+	@echo "Launching Streamlit app..."
+	streamlit run app/streamlit_app.py
+
+# Clean generated files
+clean:
+	@echo "Cleaning generated files..."
+	@rm -rf __pycache__ */__pycache__ */*/__pycache__
+	@rm -rf .pytest_cache .coverage htmlcov
+	@rm -rf *.log logs/*.log
+	@rm -f data/processed/*.pkl data/processed/*.csv
+	@rm -f data/models/*.pkl
+	@rm -f plots/*.png
+	@rm -f recommendations_*.csv recommendations_*.json
+	@echo "✅ Cleaned"
+
+# Clean everything including data
+clean-all: clean
+	@echo "Cleaning all data files..."
+	@rm -f data/raw/*.csv
+	@echo "✅ All files cleaned"
+
+# Complete setup and training pipeline
+all: setup install eda train
+	@echo "✅ Complete pipeline executed successfully!"
+
+# Data download helper (requires kaggle CLI)
+download-data:
+	@echo "Downloading InstaCart dataset from Kaggle..."
+	@echo "Make sure you have:"
+	@echo "1. Kaggle CLI installed: pip install kaggle"
+	@echo "2. Kaggle API credentials in ~/.kaggle/kaggle.json"
+	kaggle datasets download -d yasserh/instacart-online-grocery-basket-analysis-dataset -p data/raw --unzip
+	@echo "✅ Data downloaded"
+
+# Docker commands
+docker-build:
+	@echo "Building Docker image..."
+	docker build -t instacart-recommender .
+
+docker-run:
+	@echo "Running Docker container..."
+	docker run -p 8501:8501 instacart-recommender
+
+# Format code
+format:
+	@echo "Formatting code with black..."
+	black src/ scripts/ app/ tests/
+	@echo "✅ Code formatted"
+
+# Lint code
+lint:
+	@echo "Linting code..."
+	pylint src/ scripts/ app/
+	@echo "✅ Linting completed"
+
+# Generate documentation
+docs:
+	@echo "Generating documentation..."
+	pdoc --html src -o docs
+	@echo "✅ Documentation generated in docs/"
+
+# Check everything
+check: lint test
+	@echo "✅ All checks passed!"
+
+.DEFAULT_GOAL := help
