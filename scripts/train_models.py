@@ -1,5 +1,6 @@
 """
 Main script to train all collaborative filtering models including NMF
+Fixed version with proper model selection
 """
 import sys
 import os
@@ -31,7 +32,8 @@ logger = logging.getLogger(__name__)
 
 def train_all_models(
         sample_size: int = None,
-        save_models: bool = True
+        save_models: bool = True,
+        model_list: list = None
 ):
     """
     Train all collaborative filtering models including NMF
@@ -39,6 +41,7 @@ def train_all_models(
     Args:
         sample_size: Number of users to sample (None for all)
         save_models: Whether to save trained models
+        model_list: List of models to train (default: all)
     """
     logger.info("=" * 80)
     logger.info("INSTACART RECOMMENDATION SYSTEM - MODEL TRAINING")
@@ -78,41 +81,51 @@ def train_all_models(
     results = []
     models = {}
 
-    # Model configurations
-    model_configs = [
-        {
+    # Define all available model configurations
+    all_model_configs = {
+        'user_cf': {
             'name': 'User-Based CF',
-            'key': 'user_cf',
             'class': UserBasedCF,
-            'params': MODEL_PARAMS['user_based_cf'],
-            'step': 4
+            'params': MODEL_PARAMS.get('user_based_cf', {'k_neighbors': 30, 'similarity_metric': 'cosine'})
         },
-        {
+        'item_cf': {
             'name': 'Item-Based CF',
-            'key': 'item_cf',
             'class': ItemBasedCF,
-            'params': MODEL_PARAMS['item_based_cf'],
-            'step': 5
+            'params': MODEL_PARAMS.get('item_based_cf', {'k_neighbors': 30, 'similarity_metric': 'cosine'})
         },
-        {
+        'svd': {
             'name': 'SVD',
-            'key': 'svd',
             'class': SVDRecommender,
-            'params': MODEL_PARAMS['svd'],
-            'step': 6
+            'params': MODEL_PARAMS.get('svd', {'n_factors': 50, 'n_epochs': 10, 'learning_rate': 0.005, 'regularization': 0.02})
         },
-        {
+        'nmf': {
             'name': 'NMF',
-            'key': 'nmf',
             'class': NMFRecommender,
-            'params': MODEL_PARAMS['nmf'],
-            'step': 7
+            'params': MODEL_PARAMS.get('nmf', {
+                'n_components': 50,
+                'max_iter': 100,
+                'alpha_W': 0.1,
+                'alpha_H': 0.1,
+                'l1_ratio': 0.5,
+                'random_state': 42
+            })
         }
-    ]
+    }
+
+    # Determine which models to train
+    if model_list and 'all' not in model_list:
+        # Train only specified models
+        models_to_train = {k: v for k, v in all_model_configs.items() if k in model_list}
+        logger.info(f"Training selected models: {', '.join(models_to_train.keys())}")
+    else:
+        # Train all models
+        models_to_train = all_model_configs
+        logger.info("Training all models")
 
     # Train each model
-    for config in model_configs:
-        logger.info(f"\n{config['step']}. Training {config['name']}...")
+    step = 4
+    for model_key, config in models_to_train.items():
+        logger.info(f"\n{step}. Training {config['name']}...")
         logger.info("-" * 40)
 
         try:
@@ -139,22 +152,26 @@ def train_all_models(
             )
             model_results['training_time'] = training_time
             results.append(model_results)
-            models[config['key']] = model
+            models[model_key] = model
 
             # Log key metrics
             logger.info(f"RMSE: {model_results['rmse']:.4f}")
+            logger.info(f"MAE: {model_results['mae']:.4f}")
             logger.info(f"Precision@10: {model_results.get('precision@10', 0):.4f}")
+            logger.info(f"Recall@10: {model_results.get('recall@10', 0):.4f}")
 
         except Exception as e:
             logger.error(f"Error training {config['name']}: {e}")
             import traceback
             traceback.print_exc()
 
-    # Compare models
-    logger.info("\n8. Model Comparison")
-    logger.info("=" * 80)
+        step += 1
 
+    # Compare models if we have results
     if results:
+        logger.info(f"\n{step}. Model Comparison")
+        logger.info("=" * 80)
+
         comparison_df = evaluator.compare_models(results)
         evaluator.print_comparison(comparison_df)
 
@@ -168,10 +185,13 @@ def train_all_models(
             logger.info(f"\n🏆 Best Precision@10: {best_precision_model}")
 
         logger.info(f"🏆 Best RMSE: {best_rmse_model}")
+    else:
+        comparison_df = None
+        logger.warning("No models were successfully trained")
 
     # Save models if requested
     if save_models and models:
-        logger.info("\n9. Saving models...")
+        logger.info(f"\n{step+1}. Saving models...")
         for name, model in models.items():
             model_path = MODELS_DIR / f"{name}.pkl"
             model.save(model_path)
@@ -189,11 +209,14 @@ def train_all_models(
         logger.info(f"Models and data saved to {MODELS_DIR}")
 
     logger.info("\n" + "=" * 80)
-    logger.info("TRAINING COMPLETED SUCCESSFULLY!")
-    logger.info(f"Trained {len(models)} models: {', '.join(models.keys())}")
+    if models:
+        logger.info("TRAINING COMPLETED SUCCESSFULLY!")
+        logger.info(f"Trained {len(models)} model(s): {', '.join(models.keys())}")
+    else:
+        logger.info("NO MODELS WERE TRAINED")
     logger.info("=" * 80)
 
-    return models, comparison_df if 'comparison_df' in locals() else None
+    return models, comparison_df
 
 
 def generate_sample_recommendations(models, user_item_matrix, n_users=3, n_items=10):
@@ -299,18 +322,11 @@ def main():
     args = parser.parse_args()
 
     try:
-        # Check if specific models requested
-        if 'all' not in args.models:
-            # Filter MODEL_PARAMS to only requested models
-            original_params = MODEL_PARAMS.copy()
-            for model_key in list(MODEL_PARAMS.keys()):
-                if model_key.replace('_based_cf', '_cf') not in args.models:
-                    del MODEL_PARAMS[model_key]
-
         # Train models
         models, comparison_df = train_all_models(
             sample_size=args.sample_size,
-            save_models=not args.no_save
+            save_models=not args.no_save,
+            model_list=args.models
         )
 
         # Generate sample recommendations if requested

@@ -5,6 +5,7 @@ import numpy as np
 from sklearn.decomposition import NMF
 from typing import Tuple, Optional
 import logging
+from tqdm import tqdm
 from .base_model import BaseRecommender
 
 logger = logging.getLogger(__name__)
@@ -16,17 +17,19 @@ class NMFRecommender(BaseRecommender):
     """
 
     def __init__(
-            self,
-            n_components: int = 50,
-            max_iter: int = 100,
-            alpha: float = 0.1,
-            l1_ratio: float = 0.5,
-            random_state: int = 42
+        self,
+        n_components: int = 50,
+        max_iter: int = 100,
+        alpha_W: float = 0.1,
+        alpha_H: float = 0.1,
+        l1_ratio: float = 0.5,
+        random_state: int = 42
     ):
         super().__init__(name="NMF")
         self.n_components = n_components
         self.max_iter = max_iter
-        self.alpha = alpha
+        self.alpha_W = alpha_W  # Regularization for W matrix
+        self.alpha_H = alpha_H  # Regularization for H matrix
         self.l1_ratio = l1_ratio
         self.random_state = random_state
 
@@ -46,6 +49,7 @@ class NMFRecommender(BaseRecommender):
             Fitted model instance
         """
         logger.info(f"Training {self.name} with {self.n_components} components")
+        logger.info(f"Matrix shape: {train_matrix.shape} (users: {train_matrix.shape[0]}, items: {train_matrix.shape[1]})")
 
         self.train_matrix = train_matrix
 
@@ -59,12 +63,16 @@ class NMFRecommender(BaseRecommender):
             random_state=self.random_state,
             max_iter=self.max_iter,
             solver='cd',  # Coordinate descent
-            alpha=self.alpha,  # Regularization strength
+            alpha_W=self.alpha_W,  # Regularization for W matrix
+            alpha_H=self.alpha_H,  # Regularization for H matrix
             l1_ratio=self.l1_ratio,  # Balance between L1 and L2
             verbose=verbose
         )
 
-        # Fit the model
+        # Fit the model with progress indication
+        if verbose:
+            logger.info(f"Fitting NMF on {train_matrix.shape[0]} users...")
+
         self.W = self.model.fit_transform(train_matrix_positive)
         self.H = self.model.components_
 
@@ -73,6 +81,7 @@ class NMFRecommender(BaseRecommender):
         if verbose:
             reconstruction_error = self.model.reconstruction_err_
             logger.info(f"NMF training complete. Reconstruction error: {reconstruction_error:.4f}")
+            logger.info(f"Factor matrices: W={self.W.shape}, H={self.H.shape}")
 
         return self
 
@@ -93,17 +102,26 @@ class NMFRecommender(BaseRecommender):
             # Predict for single user
             predictions = self.W[user_idx].dot(self.H)
         else:
-            # Predict for all users
-            predictions = self.W.dot(self.H)
+            # Predict for all users with progress bar
+            from tqdm import tqdm
+            predictions = np.zeros_like(self.train_matrix)
+
+            # Use batch computation for efficiency
+            batch_size = 100
+            n_users = self.W.shape[0]
+
+            for i in tqdm(range(0, n_users, batch_size), desc="Generating NMF predictions"):
+                end_idx = min(i + batch_size, n_users)
+                predictions[i:end_idx] = self.W[i:end_idx].dot(self.H)
 
         # Clip predictions to valid range (0-5 for ratings)
         return np.clip(predictions, 0, 5)
 
     def recommend_items(
-            self,
-            user_idx: int,
-            n_items: int = 10,
-            exclude_seen: bool = True
+        self,
+        user_idx: int,
+        n_items: int = 10,
+        exclude_seen: bool = True
     ) -> Tuple[np.ndarray, np.ndarray]:
         """
         Generate top-N recommendations for a user
@@ -119,17 +137,27 @@ class NMFRecommender(BaseRecommender):
         if not self.is_fitted:
             raise ValueError("Model must be fitted before making recommendations")
 
+        # Get predictions for this user
         predictions = self.W[user_idx].dot(self.H)
 
         if exclude_seen:
             # Mask already interacted items
             seen_items = np.where(self.train_matrix[user_idx] > 0)[0]
-            predictions[seen_items] = -np.inf
+            predictions[seen_items] = -1  # Use -1 instead of -np.inf to avoid issues
 
         # Get top N items
         top_items = np.argsort(predictions)[-n_items:][::-1]
 
-        return top_items, predictions[top_items]
+        # Ensure scores are positive and meaningful
+        scores = predictions[top_items]
+        scores = np.maximum(scores, 0)  # Ensure non-negative
+
+        # If all scores are 0, use the raw prediction values
+        if np.all(scores == 0):
+            scores = self.W[user_idx].dot(self.H[: , top_items])
+            scores = np.abs(scores)  # Take absolute values
+
+        return top_items, scores
 
     def get_user_factors(self) -> np.ndarray:
         """Get user factor matrix"""
@@ -180,7 +208,8 @@ class NMFRecommender(BaseRecommender):
         params.update({
             'n_components': self.n_components,
             'max_iter': self.max_iter,
-            'alpha': self.alpha,
+            'alpha_W': self.alpha_W,
+            'alpha_H': self.alpha_H,
             'l1_ratio': self.l1_ratio,
             'random_state': self.random_state
         })

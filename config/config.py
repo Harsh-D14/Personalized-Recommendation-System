@@ -44,6 +44,9 @@ MODEL_PARAMS = {
     'nmf': {
         'n_components': 50,
         'max_iter': 100,
+        'alpha_W': 0.1,  # Regularization for W matrix
+        'alpha_H': 0.1,  # Regularization for H matrix
+        'l1_ratio': 0.5,
         'random_state': 42
     }
 }

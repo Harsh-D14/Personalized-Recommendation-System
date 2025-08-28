@@ -24,6 +24,14 @@ MODEL_REGISTRY = {
     'nmf': NMFRecommender
 }
 
+# Default parameters for each model
+DEFAULT_PARAMS = {
+    'user_cf': {'k_neighbors': 30, 'similarity_metric': 'cosine'},
+    'item_cf': {'k_neighbors': 30, 'similarity_metric': 'cosine'},
+    'svd': {'n_factors': 50, 'n_epochs': 10, 'learning_rate': 0.005, 'regularization': 0.02},
+    'nmf': {'n_components': 50, 'max_iter': 100, 'alpha_W': 0.1, 'alpha_H': 0.1, 'l1_ratio': 0.5}
+}
+
 
 def get_model(model_name: str, **kwargs):
     """
@@ -40,4 +48,9 @@ def get_model(model_name: str, **kwargs):
         raise ValueError(f"Unknown model: {model_name}. Available: {list(MODEL_REGISTRY.keys())}")
 
     model_class = MODEL_REGISTRY[model_name]
-    return model_class(**kwargs)
+
+    # Merge default parameters with provided parameters
+    params = DEFAULT_PARAMS.get(model_name, {}).copy()
+    params.update(kwargs)
+
+    return model_class(**params)

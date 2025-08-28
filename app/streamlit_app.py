@@ -1,5 +1,5 @@
 """
-Streamlit Web Application for InstaCart Recommendation System
+Fixed Streamlit Web Application for InstaCart Recommendation System
 """
 import streamlit as st
 import pandas as pd
@@ -9,6 +9,7 @@ import plotly.express as px
 from pathlib import Path
 import sys
 import os
+import pickle
 
 # Add parent directory to path
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -17,7 +18,7 @@ from src.data_loader import DataLoader
 from src.models.user_based_cf import UserBasedCF
 from src.models.item_based_cf import ItemBasedCF
 from src.models.svd_model import SVDRecommender
-from config.config import MODELS_DIR, PROCESSED_DATA_DIR
+from src.models.nmf_model import NMFRecommender
 
 # Page configuration
 st.set_page_config(
@@ -46,13 +47,6 @@ st.markdown("""
         background-color: #45a049;
         transform: scale(1.05);
     }
-    .recommendation-card {
-        background-color: #f0f2f6;
-        padding: 1rem;
-        border-radius: 10px;
-        margin: 0.5rem 0;
-        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-    }
     .metric-card {
         background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
         color: white;
@@ -65,40 +59,44 @@ st.markdown("""
 
 
 @st.cache_resource
-def load_models():
-    """Load trained models"""
+def load_all_models():
+    """Load all trained models"""
     models = {}
+    models_dir = Path('data/models')
 
-    # Check if models exist
+    # Model file mappings
     model_files = {
         'User-Based CF': 'user_cf.pkl',
         'Item-Based CF': 'item_cf.pkl',
-        'SVD': 'svd.pkl'
+        'SVD': 'svd.pkl',
+        'NMF': 'nmf.pkl'
     }
 
     for name, filename in model_files.items():
-        filepath = MODELS_DIR / filename
+        filepath = models_dir / filename
         if filepath.exists():
             try:
-                if name == 'User-Based CF':
-                    models[name] = UserBasedCF.load(filepath)
-                elif name == 'Item-Based CF':
-                    models[name] = ItemBasedCF.load(filepath)
-                elif name == 'SVD':
-                    models[name] = SVDRecommender.load(filepath)
+                with open(filepath, 'rb') as f:
+                    models[name] = pickle.load(f)
+                st.sidebar.success(f"✓ Loaded {name}")
             except Exception as e:
-                st.error(f"Error loading {name}: {e}")
+                st.sidebar.warning(f"⚠ Could not load {name}: {str(e)[:30]}")
+        else:
+            st.sidebar.info(f"ℹ {name} not found")
+
+    if not models:
+        st.sidebar.error("No models found! Please run train_all_models.py first")
 
     return models
 
 
 @st.cache_data
-def load_data():
+def load_all_data():
     """Load necessary data"""
     data_loader = DataLoader()
 
-    # Load processed data
     try:
+        # Load processed data
         user_item_matrix = data_loader.load_processed_data("user_item_matrix")
 
         # Load product information
@@ -121,61 +119,79 @@ def load_data():
 def display_recommendations(recommendations, scores, product_names):
     """Display recommendations in a nice format"""
     for i, (item_id, score) in enumerate(zip(recommendations, scores), 1):
-        if item_id in product_names:
-            col1, col2 = st.columns([4, 1])
-            with col1:
-                st.markdown(f"**{i}. {product_names[item_id]}**")
-            with col2:
-                st.metric("Score", f"{score:.2f}")
+        col1, col2, col3 = st.columns([5, 2, 1])
+
+        with col1:
+            product_name = product_names.get(item_id, f"Product {item_id}")
+            st.write(f"**{i}. {product_name}**")
+
+        with col2:
+            # Star rating based on score
+            if score > 2.0:
+                stars = "⭐⭐⭐⭐⭐"
+            elif score > 1.5:
+                stars = "⭐⭐⭐⭐"
+            elif score > 1.0:
+                stars = "⭐⭐⭐"
+            elif score > 0.5:
+                stars = "⭐⭐"
+            else:
+                stars = "⭐"
+            st.write(stars)
+
+        with col3:
+            st.metric("Score", f"{score:.2f}", label_visibility="collapsed")
 
 
 def main():
-    # Title and description
+    # Title
     st.title("🛒 InstaCart Recommendation System")
-    st.markdown("### Personalized Product Recommendations using Collaborative Filtering")
+    st.markdown("### AI-Powered Grocery Shopping Recommendations")
 
     # Sidebar
     with st.sidebar:
-        st.header("⚙️ Settings")
+        st.header("⚙️ Configuration")
 
-        # Model selection
-        models = load_models()
-        if not models:
-            st.error("No trained models found. Please run train_models.py first.")
-            return
+        # Load models
+        models = load_all_models()
 
-        selected_model = st.selectbox(
-            "Select Model",
-            options=list(models.keys()),
-            help="Choose the recommendation algorithm"
-        )
+        if models:
+            selected_model = st.selectbox(
+                "Select Model",
+                options=list(models.keys()),
+                help="Choose the recommendation algorithm"
+            )
 
-        n_recommendations = st.slider(
-            "Number of Recommendations",
-            min_value=5,
-            max_value=20,
-            value=10,
-            help="How many products to recommend"
-        )
+            n_recommendations = st.slider(
+                "Number of Recommendations",
+                min_value=5,
+                max_value=20,
+                value=10
+            )
 
-        st.markdown("---")
-        st.header("📊 Model Info")
+            st.markdown("---")
+            st.header("📊 Model Info")
 
-        if selected_model in models:
-            model = models[selected_model]
-            params = model.get_params()
-            for key, value in params.items():
-                if key != 'name':
-                    st.text(f"{key}: {value}")
+            if selected_model in models:
+                model = models[selected_model]
+                st.text(f"Model: {selected_model}")
+                st.text(f"Fitted: ✓")
+                if hasattr(model, 'get_params'):
+                    params = model.get_params()
+                    with st.expander("Parameters"):
+                        for key, value in params.items():
+                            if key not in ['name', 'is_fitted']:
+                                st.text(f"{key}: {value}")
 
     # Load data
-    user_item_matrix, products_full, product_names = load_data()
+    user_item_matrix, products_full, product_names = load_all_data()
 
-    if user_item_matrix is None:
-        st.error("Failed to load data. Please check data files.")
+    if user_item_matrix is None or not models:
+        st.error("⚠️ Please ensure data is loaded and models are trained")
+        st.info("Run: `python scripts/train_all_models.py` to train models")
         return
 
-    # Main content
+    # Main tabs
     tab1, tab2, tab3, tab4 = st.tabs([
         "🎯 Get Recommendations",
         "🔍 Find Similar Products",
@@ -183,47 +199,42 @@ def main():
         "📊 Data Insights"
     ])
 
+    # Tab 1: Recommendations
     with tab1:
         st.header("Get Personalized Recommendations")
 
         col1, col2 = st.columns([1, 1])
 
         with col1:
-            # User selection
             st.subheader("Select User")
 
-            # Random user button
+            # User selection
             if st.button("🎲 Random User"):
                 st.session_state['selected_user_idx'] = np.random.choice(len(user_item_matrix))
 
-            # Manual user selection
             user_idx = st.number_input(
-                "Or enter User Index",
+                "User Index",
                 min_value=0,
-                max_value=len(user_item_matrix) - 1,
+                max_value=len(user_item_matrix)-1,
                 value=st.session_state.get('selected_user_idx', 0)
             )
-
             st.session_state['selected_user_idx'] = user_idx
 
-            # Show user's purchase history
-            st.subheader("Purchase History")
+            # User info
             user_id = user_item_matrix.index[user_idx]
             purchased_items = user_item_matrix.columns[user_item_matrix.iloc[user_idx] > 0].tolist()
 
-            if purchased_items:
-                st.info(f"User {user_id} has purchased {len(purchased_items)} different products")
+            st.info(f"**User {user_id}** | **{len(purchased_items)}** products purchased")
 
-                # Show sample of purchased items
-                with st.expander("View Purchase History (First 10)"):
-                    for item_id in purchased_items[:10]:
-                        if item_id in product_names:
-                            st.write(f"• {product_names[item_id]}")
-            else:
-                st.warning("This user has no purchase history")
+            with st.expander("View Purchase History"):
+                for i, item_id in enumerate(purchased_items[:10], 1):
+                    if item_id in product_names:
+                        st.write(f"{i}. {product_names[item_id]}")
+                if len(purchased_items) > 10:
+                    st.write(f"... and {len(purchased_items)-10} more")
 
         with col2:
-            st.subheader(f"Recommendations using {selected_model}")
+            st.subheader(f"Recommendations: {selected_model}")
 
             if st.button("🚀 Generate Recommendations", type="primary"):
                 with st.spinner("Generating recommendations..."):
@@ -237,85 +248,88 @@ def main():
                         # Map to product IDs
                         rec_product_ids = user_item_matrix.columns[recommendations].tolist()
 
-                        # Display recommendations
-                        st.success("Recommendations generated!")
+                        st.success("✓ Recommendations generated!")
                         display_recommendations(rec_product_ids, scores, product_names)
 
                     except Exception as e:
-                        st.error(f"Error generating recommendations: {e}")
+                        st.error(f"Error: {e}")
 
+    # Tab 2: Similar Products
     with tab2:
         st.header("Find Similar Products")
 
-        if selected_model == "Item-Based CF":
-            # Product search
-            search_term = st.text_input("Search for a product", placeholder="e.g., Banana")
+        if "Item-Based CF" in models:
+            search_term = st.text_input("🔍 Search for a product", placeholder="e.g., Banana, Milk, Bread")
 
             if search_term:
                 # Find matching products
-                matching_products = [
-                    (pid, pname) for pid, pname in product_names.items()
-                    if search_term.lower() in pname.lower()
-                ]
+                matching = [(pid, pname) for pid, pname in product_names.items()
+                          if search_term.lower() in pname.lower()]
 
-                if matching_products:
-                    # Select product
+                if matching:
+                    # Show matches
                     selected_product = st.selectbox(
-                        "Select a product",
-                        options=matching_products,
+                        "Select product:",
+                        options=matching[:20],
                         format_func=lambda x: x[1]
                     )
 
                     if st.button("Find Similar Products"):
-                        try:
-                            # Get product index
-                            if selected_product[0] in user_item_matrix.columns:
+                        if selected_product[0] in user_item_matrix.columns:
+                            try:
                                 item_idx = user_item_matrix.columns.get_loc(selected_product[0])
+                                model = models["Item-Based CF"]
 
-                                model = models[selected_model]
                                 similar_items, similarity_scores = model.find_similar_items(
                                     item_idx,
                                     n_recommendations
                                 )
 
-                                # Display similar products
-                                st.subheader(f"Products similar to: {selected_product[1]}")
+                                st.subheader(f"Products similar to: **{selected_product[1]}**")
 
-                                similar_product_ids = user_item_matrix.columns[similar_items].tolist()
-                                for i, (item_id, sim_score) in enumerate(zip(similar_product_ids, similarity_scores),
-                                                                         1):
+                                similar_ids = user_item_matrix.columns[similar_items].tolist()
+                                for i, (item_id, sim) in enumerate(zip(similar_ids, similarity_scores), 1):
                                     if item_id in product_names:
                                         col1, col2 = st.columns([4, 1])
                                         with col1:
                                             st.write(f"{i}. {product_names[item_id]}")
                                         with col2:
-                                            st.metric("Similarity", f"{sim_score:.3f}")
-                            else:
-                                st.warning("Product not found in the interaction matrix")
-                        except Exception as e:
-                            st.error(f"Error finding similar products: {e}")
+                                            st.metric("Similarity", f"{sim:.3f}", label_visibility="collapsed")
+
+                            except Exception as e:
+                                st.error(f"Error: {e}")
+                        else:
+                            st.warning("Product not in interaction matrix")
                 else:
-                    st.warning("No products found matching your search")
+                    st.warning(f"No products found matching '{search_term}'")
         else:
-            st.info("Similar product search is only available for Item-Based CF model")
+            st.info("Item-Based CF model required for this feature")
 
+    # Tab 3: Model Performance
     with tab3:
-        st.header("Model Performance Comparison")
+        st.header("Model Performance Metrics")
 
-        # Load model comparison results
-        comparison_file = MODELS_DIR / "model_comparison.csv"
+        # Load comparison data
+        comparison_file = Path('data/models/model_comparison.csv')
         if comparison_file.exists():
             comparison_df = pd.read_csv(comparison_file)
 
             # Display metrics table
-            st.subheader("Performance Metrics")
-            st.dataframe(comparison_df, width='stretch')
+            st.subheader("📊 Performance Comparison")
 
-            # Visualize metrics
+            # Format the dataframe
+            formatted_df = comparison_df.copy()
+            for col in formatted_df.columns:
+                if col != 'model' and 'time' not in col:
+                    formatted_df[col] = formatted_df[col].round(4)
+
+            st.dataframe(formatted_df, use_container_width=True)
+
+            # Visualizations
             col1, col2 = st.columns(2)
 
             with col1:
-                # RMSE and MAE comparison
+                # RMSE and MAE
                 fig_error = go.Figure()
                 fig_error.add_trace(go.Bar(
                     name='RMSE',
@@ -330,75 +344,73 @@ def main():
                     marker_color='lightblue'
                 ))
                 fig_error.update_layout(
-                    title="Error Metrics Comparison",
-                    xaxis_title="Model",
-                    yaxis_title="Error",
-                    barmode='group'
+                    title="Error Metrics (Lower is Better)",
+                    barmode='group',
+                    height=400
                 )
-                st.plotly_chart(fig_error, width='stretch')
+                st.plotly_chart(fig_error, use_container_width=True)
 
             with col2:
-                # Precision and Recall comparison
+                # Precision and Recall
                 fig_pr = go.Figure()
-                fig_pr.add_trace(go.Bar(
-                    name='Precision@10',
-                    x=comparison_df['model'],
-                    y=comparison_df['precision@10'],
-                    marker_color='green'
-                ))
-                fig_pr.add_trace(go.Bar(
-                    name='Recall@10',
-                    x=comparison_df['model'],
-                    y=comparison_df['recall@10'],
-                    marker_color='purple'
-                ))
+                if 'precision@10' in comparison_df.columns:
+                    fig_pr.add_trace(go.Bar(
+                        name='Precision@10',
+                        x=comparison_df['model'],
+                        y=comparison_df['precision@10'],
+                        marker_color='green'
+                    ))
+                if 'recall@10' in comparison_df.columns:
+                    fig_pr.add_trace(go.Bar(
+                        name='Recall@10',
+                        x=comparison_df['model'],
+                        y=comparison_df['recall@10'],
+                        marker_color='purple'
+                    ))
                 fig_pr.update_layout(
-                    title="Precision & Recall @10",
-                    xaxis_title="Model",
-                    yaxis_title="Score",
-                    barmode='group'
+                    title="Precision & Recall (Higher is Better)",
+                    barmode='group',
+                    height=400
                 )
-                st.plotly_chart(fig_pr, width='stretch')
-        else:
-            st.warning("No model comparison data found. Please run training script first.")
+                st.plotly_chart(fig_pr, use_container_width=True)
 
-    with tab4:
-        st.header("Data Insights")
-
-        if products_full is not None:
-            col1, col2, col3 = st.columns(3)
-
+            # Best models
+            st.subheader("🏆 Best Models")
+            col1, col2 = st.columns(2)
             with col1:
-                st.metric("Total Products", f"{len(products_full):,}")
+                best_rmse = comparison_df.loc[comparison_df['rmse'].idxmin(), 'model']
+                st.metric("Best RMSE", best_rmse)
             with col2:
-                st.metric("Total Users", f"{len(user_item_matrix):,}")
-            with col3:
-                sparsity = (user_item_matrix == 0).sum().sum() / user_item_matrix.size
-                st.metric("Matrix Sparsity", f"{sparsity:.1%}")
+                if 'precision@10' in comparison_df.columns:
+                    best_prec = comparison_df.loc[comparison_df['precision@10'].idxmax(), 'model']
+                    st.metric("Best Precision@10", best_prec)
+        else:
+            st.warning("No model comparison data found. Train models first!")
 
-            # Department distribution
-            st.subheader("Top Departments by Product Count")
-            dept_counts = products_full['department'].value_counts().head(10)
-            fig_dept = px.bar(
-                x=dept_counts.values,
-                y=dept_counts.index,
-                orientation='h',
-                labels={'x': 'Number of Products', 'y': 'Department'},
-                color=dept_counts.values,
-                color_continuous_scale='Viridis'
-            )
-            st.plotly_chart(fig_dept, width='stretch')
+    # Tab 4: Data Insights
+    with tab4:
+        st.header("Dataset Insights")
 
-            # User activity distribution
-            st.subheader("User Activity Distribution")
-            user_activity = (user_item_matrix > 0).sum(axis=1)
-            fig_activity = px.histogram(
-                user_activity,
-                nbins=30,
-                labels={'value': 'Number of Products Purchased', 'count': 'Number of Users'},
-                title="Distribution of Products Purchased per User"
-            )
-            st.plotly_chart(fig_activity, width='stretch')
+        col1, col2, col3 = st.columns(3)
+        with col1:
+            st.metric("Total Products", f"{len(products_full):,}")
+        with col2:
+            st.metric("Total Users", f"{len(user_item_matrix):,}")
+        with col3:
+            sparsity = (user_item_matrix == 0).sum().sum() / user_item_matrix.size
+            st.metric("Matrix Sparsity", f"{sparsity:.1%}")
+
+        # Department distribution
+        st.subheader("Product Distribution")
+        dept_counts = products_full['department'].value_counts().head(10)
+        fig = px.bar(
+            x=dept_counts.values,
+            y=dept_counts.index,
+            orientation='h',
+            labels={'x': 'Number of Products', 'y': 'Department'},
+            title="Top 10 Departments by Product Count"
+        )
+        st.plotly_chart(fig, use_container_width=True)
 
 
 if __name__ == "__main__":
