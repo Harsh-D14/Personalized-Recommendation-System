@@ -1,51 +1,51 @@
 user_id,rank,product_id,product_name,score
-15,1,44683,Brussels Sprouts,0.764534610764579
-15,2,9601,Organic Yellow Onions,0.764534610764579
-15,3,41352,Pure Cane Golden Brown Sugar,0.764534610764579
-15,4,17902,Liquid Egg Whites,0.764534610764579
-15,5,15200,Organic Green Beans,0.764534610764579
-15,6,38768,Sweet Kale Salad Mix,0.764534610764579
-15,7,22362,Original Rice Krispies Treats,0.764534610764579
-15,8,47348,Heavy Duty Aluminum Foil,0.764534610764579
-15,9,14159,Seedless Watermelon,0.764534610764579
-15,10,19887,Unsweetened Vanilla Almond Breeze,0.764534610764579
-95,1,42300,Organic Vitality Snack Chia Squeeze Blackberry Bliss,0.7407407407407407
-95,2,42812,"Meal Bar, Superberry & Greens",0.7407407407407407
-95,3,2813,Whole Grain Angel Hair Pasta,0.7407407407407407
-95,4,40587,Light & Lean Sweet & Sour Asian Noodle Pasta,0.7407407407407407
-95,5,3822,Green Magic Chia Squeeze,0.7407407407407407
-95,6,4952,Unsweet Peach Water,0.7407407407407407
-95,7,7401,Raw Chocolate Cacao Nibs,0.7407407407407407
-95,8,36758,Triple Berry Blend,0.7407407407407407
-95,9,36780,90 Calorie Chocolate Chewy Bars,0.7407407407407407
-95,10,37019,Dairy Free Gluten Free Cookie Dough Coconut Milk Frozen Dessert,0.7407407407407407
-19,1,37107,Ground Cumin,0.37037037037037035
-19,2,35042,Black Beans,0.37037037037037035
-19,3,2512,99% Fat Free Chicken Broth,0.37037037037037035
-19,4,25544,Fresh Cut Golden Sweet Whole Kernel Corn,0.37037037037037035
-19,5,23734,Sour Cream,0.37037037037037035
-19,6,11408,Crushed Tomatoes,0.37037037037037035
-19,7,29,Fresh Cut Golden Sweet No Salt Added Whole Kernel Corn,0.37037037037037035
-19,8,14536,Natural Goodness 33% Less Sodium Chicken Broth,0.37037037037037035
-19,9,17264,Stand 'n Stuff Taco Shells,0.37037037037037035
-19,10,43183,Deli Fresh Shaved Smoked Turkey Breast,0.3703703703703703
-77,1,31618,Thick Medium Cheddar Slices,0.3915003715185715
-77,2,30020,Organic Multigrain Snack Crackers,0.3915003715185715
-77,3,27958,Chicken Drumsticks,0.3915003715185715
-77,4,23233,California Sourdough Bread,0.3915003715185715
-77,5,33847,Cookies And Cream Ice Cream,0.3915003715185715
-77,6,36961,Pink Cripps Apple,0.3915003715185715
-77,7,21724,Stir-fry Rice Noodles,0.3915003715185715
-77,8,20649,Refresh-Mint Chewing Gum,0.3915003715185715
-77,9,22007,Minced Ginger,0.3915003715185715
-77,10,38288,Pizza Sauce,0.3915003715185715
-74,1,3672,Gourmet Mango Mochi Sherbet Bonbons,0.18518518518518517
-74,2,49374,Organic Cultured Cream Cheese Spread,0.18518518518518517
-74,3,4559,Vanilla Frosting,0.18518518518518517
-74,4,5605,Sesame Seed,0.18518518518518517
-74,5,5989,Sliced Tamed Jalapeno Peppers,0.18518518518518517
-74,6,6292,Organic Fire Roasted Corn,0.18518518518518517
-74,7,8025,Uncured Beef Hot Dogs,0.18518518518518517
-74,8,8076,Euro Classic Brioche Hot Dog Buns,0.18518518518518517
-74,9,8309,Nonfat Icelandic Style Strawberry Yogurt,0.18518518518518517
-74,10,8503,Clearing Eucalyptus Mineral Bath,0.18518518518518517
+2670,1,18572,Decaffeinated House Blend Dark Roast Ground Coffee,0.4466559775834262
+2670,2,25755,Singles Supreme French Bread Pizzas,0.4466559775834262
+2670,3,26533,Smoked Norwegian Salmon,0.4466559775834262
+2670,4,5678,Deil Style Kosher Dill Relish,0.4466559775834262
+2670,5,11785,Condensed Soup Healthy Request Bean With Bacon,0.4466559775834262
+2670,6,13334,Strawberry Blueberry Yogurt,0.40586018720375994
+2670,7,39668,Passover Crackers Lightly Salted Tam Tams,0.40586018720375994
+2670,8,28039,Flour Tortillas For Soft Tacos & Fajitas,0.40586018720375994
+2670,9,44373,Manisch Everything Tam,0.40586018720375994
+2670,10,10950,Bran Flakes Whole Grain Wheat Cereal,0.40586018720375994
+1584,1,37488,Health Loaf,1.5934065934065935
+1584,2,23928,Butter Chicken Simmer Sauce,1.5934065934065935
+1584,3,14873,Fruit Cocktail In Heavy Syrup,1.5934065934065933
+1584,4,40702,Wine Snack Herring,1.5934065934065933
+1584,5,12972,"Popping Corn, Gourmet, Simply Salted",1.5934065934065933
+1584,6,15320,Hickory Brown Sugar Barbecue Sauce,1.5934065934065933
+1584,7,1317,Calming Comfort Baby Lotion,1.5934065934065933
+1584,8,31005,Fit Berry Blast Liquid Water Enhancer,1.5934065934065933
+1584,9,43124,Kick Start Energizing Fruit Punch Sparkling Juice Beverage,1.5934065934065933
+1584,10,11876,Chicken & Vegetable Potstickers,1.5934065934065933
+5158,1,23601,Clover Honey,0.16483516483516486
+5158,2,35219,Gluten Free Taco Sauce,0.16483516483516486
+5158,3,28,Wheat Chex Cereal,0.16483516483516486
+5158,4,47176,Comforting Geranium Aromatherapy Mineral Bath,0.16483516483516486
+5158,5,37002,Green Jalapeno Pepper Sauce,0.16483516483516486
+5158,6,4508,Spinach & Cheese Pupusas,0.16483516483516486
+5158,7,15453,Gluten Free Vanilla Creme Cookies,0.16483516483516486
+5158,8,49265,Milk Chocolate Candy,0.16483516483516486
+5158,9,11331,Deluxe Mixed Nuts,0.16483516483516486
+5158,10,2579,Organic Freeze Dried Instant Decaf Coffee,0.16483516483516483
+797,1,35145,Infusions Ultra Downy® Infusions™ Lavender Serenity™ Fabric Softener Sheets 105 count Fabric Enhancers,0.43956043956043966
+797,2,23566,"\""Constant Comment\"" Black Tea",0.43956043956043966
+797,3,35556,Natural Hard Apple Cider,0.43956043956043966
+797,4,41022,Lime Sparkling Water Beverage,0.43956043956043966
+797,5,46186,Sparkling Sweet Rose,0.43956043956043966
+797,6,25028,Posted 3/5/2013 Anti-Dandruff Shampoo,0.43956043956043966
+797,7,4209,All Natural Sriracha Popcorn,0.43956043956043966
+797,8,6505,Fat Free Sour Cream & Onion Potato Crisps,0.43956043956043966
+797,9,46560,"Low Pulp, Calcium & Vitamin D Orange Juice Beverage",0.43956043956043966
+797,10,38836,Starmont Cabernet Sauvignon Napa Valley,0.43956043956043966
+2508,1,16820,Season All Seasoned Salt,0.2197802197802198
+2508,2,1438,Men Clinical+ Clean Anti-Perspirant & Deodorant,0.2197802197802198
+2508,3,41616,Spinach & Artichoke Parmesan Dip,0.2197802197802198
+2508,4,44484,Grain Free Naturals Dry Dog Food Chicken & Garden Pea Recipe,0.2197802197802198
+2508,5,48172,Culture Club Kombucha Goji Ginger,0.2197802197802198
+2508,6,26783,Coconut & Almond Milk Blend,0.2197802197802198
+2508,7,43803,Baby Corn on the Cob Whole Spears,0.2197802197802198
+2508,8,6630,Home Style French Toast,0.2197802197802198
+2508,9,40436,Fresh Mozzarella Ovolini Packed In Water,0.2197802197802198
+2508,10,37771,Magnesium 250 mg Tablets,0.2197802197802198
