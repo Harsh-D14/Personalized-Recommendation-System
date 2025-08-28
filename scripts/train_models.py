@@ -1,5 +1,5 @@
 """
-Main script to train all collaborative filtering models
+Main script to train all collaborative filtering models including NMF
 """
 import sys
 import os
@@ -22,6 +22,7 @@ from src.evaluator import Evaluator
 from src.models.user_based_cf import UserBasedCF
 from src.models.item_based_cf import ItemBasedCF
 from src.models.svd_model import SVDRecommender
+from src.models.nmf_model import NMFRecommender
 
 # Configure logging
 logging.basicConfig(**LOGGING_CONFIG)
@@ -33,7 +34,7 @@ def train_all_models(
         save_models: bool = True
 ):
     """
-    Train all collaborative filtering models
+    Train all collaborative filtering models including NMF
 
     Args:
         sample_size: Number of users to sample (None for all)
@@ -41,6 +42,7 @@ def train_all_models(
     """
     logger.info("=" * 80)
     logger.info("INSTACART RECOMMENDATION SYSTEM - MODEL TRAINING")
+    logger.info("Including: User-CF, Item-CF, SVD, and NMF")
     logger.info("=" * 80)
 
     # Initialize data loader
@@ -76,98 +78,122 @@ def train_all_models(
     results = []
     models = {}
 
-    # Train User-Based CF
-    logger.info("\n4. Training User-Based Collaborative Filtering...")
-    start_time = time.time()
+    # Model configurations
+    model_configs = [
+        {
+            'name': 'User-Based CF',
+            'key': 'user_cf',
+            'class': UserBasedCF,
+            'params': MODEL_PARAMS['user_based_cf'],
+            'step': 4
+        },
+        {
+            'name': 'Item-Based CF',
+            'key': 'item_cf',
+            'class': ItemBasedCF,
+            'params': MODEL_PARAMS['item_based_cf'],
+            'step': 5
+        },
+        {
+            'name': 'SVD',
+            'key': 'svd',
+            'class': SVDRecommender,
+            'params': MODEL_PARAMS['svd'],
+            'step': 6
+        },
+        {
+            'name': 'NMF',
+            'key': 'nmf',
+            'class': NMFRecommender,
+            'params': MODEL_PARAMS['nmf'],
+            'step': 7
+        }
+    ]
 
-    user_cf = UserBasedCF(**MODEL_PARAMS['user_based_cf'])
-    user_cf.fit(train_matrix)
-    user_cf_predictions = user_cf.predict()
+    # Train each model
+    for config in model_configs:
+        logger.info(f"\n{config['step']}. Training {config['name']}...")
+        logger.info("-" * 40)
 
-    training_time = time.time() - start_time
-    logger.info(f"Training completed in {training_time:.2f} seconds")
+        try:
+            start_time = time.time()
 
-    # Evaluate
-    user_cf_results = evaluator.evaluate_model(
-        user_cf_predictions,
-        test_matrix,
-        k_values=[5, 10],
-        model_name="User-Based CF"
-    )
-    user_cf_results['training_time'] = training_time
-    results.append(user_cf_results)
-    models['user_cf'] = user_cf
+            # Initialize model
+            model = config['class'](**config['params'])
 
-    # Train Item-Based CF
-    logger.info("\n5. Training Item-Based Collaborative Filtering...")
-    start_time = time.time()
+            # Fit model
+            model.fit(train_matrix)
 
-    item_cf = ItemBasedCF(**MODEL_PARAMS['item_based_cf'])
-    item_cf.fit(train_matrix)
-    item_cf_predictions = item_cf.predict()
+            # Generate predictions
+            predictions = model.predict()
 
-    training_time = time.time() - start_time
-    logger.info(f"Training completed in {training_time:.2f} seconds")
+            training_time = time.time() - start_time
+            logger.info(f"Training completed in {training_time:.2f} seconds")
 
-    # Evaluate
-    item_cf_results = evaluator.evaluate_model(
-        item_cf_predictions,
-        test_matrix,
-        k_values=[5, 10],
-        model_name="Item-Based CF"
-    )
-    item_cf_results['training_time'] = training_time
-    results.append(item_cf_results)
-    models['item_cf'] = item_cf
+            # Evaluate
+            model_results = evaluator.evaluate_model(
+                predictions,
+                test_matrix,
+                k_values=[5, 10],
+                model_name=config['name']
+            )
+            model_results['training_time'] = training_time
+            results.append(model_results)
+            models[config['key']] = model
 
-    # Train SVD
-    logger.info("\n6. Training SVD Matrix Factorization...")
-    start_time = time.time()
+            # Log key metrics
+            logger.info(f"RMSE: {model_results['rmse']:.4f}")
+            logger.info(f"Precision@10: {model_results.get('precision@10', 0):.4f}")
 
-    svd_model = SVDRecommender(**MODEL_PARAMS['svd'])
-    svd_model.fit(train_matrix)
-    svd_predictions = svd_model.predict()
-
-    training_time = time.time() - start_time
-    logger.info(f"Training completed in {training_time:.2f} seconds")
-
-    # Evaluate
-    svd_results = evaluator.evaluate_model(
-        svd_predictions,
-        test_matrix,
-        k_values=[5, 10],
-        model_name="SVD"
-    )
-    svd_results['training_time'] = training_time
-    results.append(svd_results)
-    models['svd'] = svd_model
+        except Exception as e:
+            logger.error(f"Error training {config['name']}: {e}")
+            import traceback
+            traceback.print_exc()
 
     # Compare models
-    logger.info("\n7. Model Comparison")
-    comparison_df = evaluator.compare_models(results)
-    evaluator.print_comparison(comparison_df)
+    logger.info("\n8. Model Comparison")
+    logger.info("=" * 80)
+
+    if results:
+        comparison_df = evaluator.compare_models(results)
+        evaluator.print_comparison(comparison_df)
+
+        # Find best models
+        best_rmse_idx = comparison_df['rmse'].idxmin()
+        best_rmse_model = comparison_df.loc[best_rmse_idx, 'model']
+
+        if 'precision@10' in comparison_df.columns:
+            best_precision_idx = comparison_df['precision@10'].idxmax()
+            best_precision_model = comparison_df.loc[best_precision_idx, 'model']
+            logger.info(f"\n🏆 Best Precision@10: {best_precision_model}")
+
+        logger.info(f"🏆 Best RMSE: {best_rmse_model}")
 
     # Save models if requested
-    if save_models:
-        logger.info("\n8. Saving models...")
+    if save_models and models:
+        logger.info("\n9. Saving models...")
         for name, model in models.items():
             model_path = MODELS_DIR / f"{name}.pkl"
             model.save(model_path)
+            logger.info(f"  ✓ Saved {name}.pkl")
 
         # Save comparison results
-        comparison_df.to_csv(MODELS_DIR / "model_comparison.csv", index=False)
-        logger.info(f"Models saved to {MODELS_DIR}")
+        if results:
+            comparison_df.to_csv(MODELS_DIR / "model_comparison.csv", index=False)
+            logger.info(f"  ✓ Saved model_comparison.csv")
 
         # Save matrices for later use
         data_loader.save_processed_data("user_item_matrix", matrix_df)
         data_loader.save_processed_data("train_matrix", train_matrix)
         data_loader.save_processed_data("test_matrix", test_matrix)
+        logger.info(f"Models and data saved to {MODELS_DIR}")
 
     logger.info("\n" + "=" * 80)
     logger.info("TRAINING COMPLETED SUCCESSFULLY!")
+    logger.info(f"Trained {len(models)} models: {', '.join(models.keys())}")
     logger.info("=" * 80)
 
-    return models, comparison_df
+    return models, comparison_df if 'comparison_df' in locals() else None
 
 
 def generate_sample_recommendations(models, user_item_matrix, n_users=3, n_items=10):
@@ -185,36 +211,62 @@ def generate_sample_recommendations(models, user_item_matrix, n_users=3, n_items
     logger.info("=" * 80)
 
     # Load product names
-    products_df = pd.read_csv(Path('data/raw/products.csv'))
-    product_names = dict(zip(products_df['product_id'], products_df['product_name']))
+    try:
+        products_df = pd.read_csv(Path('data/raw/products.csv'))
+        product_names = dict(zip(products_df['product_id'], products_df['product_name']))
+    except Exception as e:
+        logger.warning(f"Could not load product names: {e}")
+        product_names = {}
 
     # Select random users
-    sample_users = np.random.choice(len(user_item_matrix), n_users, replace=False)
+    sample_users = np.random.choice(len(user_item_matrix), min(n_users, len(user_item_matrix)), replace=False)
 
     for user_idx in sample_users:
         user_id = user_item_matrix.index[user_idx]
-        logger.info(f"\nUser {user_id}:")
+        logger.info(f"\n{'='*60}")
+        logger.info(f"User {user_id} (Index: {user_idx})")
+        logger.info(f"{'='*60}")
 
         # Show user's purchase history
         purchased_items = user_item_matrix.columns[user_item_matrix.iloc[user_idx] > 0].tolist()
-        logger.info(f"Previous purchases (sample):")
-        for item_id in purchased_items[:5]:
-            if item_id in product_names:
-                logger.info(f"  - {product_names[item_id]}")
+        logger.info(f"Previous purchases: {len(purchased_items)} products")
+
+        if product_names:
+            logger.info("Sample purchases:")
+            for item_id in purchased_items[:5]:
+                if item_id in product_names:
+                    logger.info(f"  • {product_names[item_id]}")
+
+        if len(purchased_items) > 5:
+            logger.info(f"  ... and {len(purchased_items) - 5} more products")
 
         # Get recommendations from each model
         for model_name, model in models.items():
-            logger.info(f"\n{model_name} recommendations:")
+            logger.info(f"\n{model_name.upper()} Recommendations:")
             try:
                 rec_items, scores = model.recommend_items(user_idx, n_items)
 
                 # Map to product IDs and names
                 rec_product_ids = user_item_matrix.columns[rec_items].tolist()
+
                 for i, (item_id, score) in enumerate(zip(rec_product_ids, scores), 1):
-                    if item_id in product_names:
-                        logger.info(f"  {i}. {product_names[item_id]} (score: {score:.3f})")
+                    if product_names and item_id in product_names:
+                        # Add confidence level based on score
+                        if score > 1.5:
+                            confidence = "⭐⭐⭐⭐⭐"
+                        elif score > 1.0:
+                            confidence = "⭐⭐⭐⭐"
+                        elif score > 0.5:
+                            confidence = "⭐⭐⭐"
+                        else:
+                            confidence = "⭐⭐"
+
+                        logger.info(f"  {i:2d}. {product_names[item_id]} (score: {score:.3f}) {confidence}")
+                    else:
+                        logger.info(f"  {i:2d}. Product {item_id} (score: {score:.3f})")
+
             except Exception as e:
-                logger.error(f"Error generating recommendations: {e}")
+                logger.error(f"  Error generating recommendations: {e}")
 
 
 def main():
@@ -236,10 +288,25 @@ def main():
         action='store_true',
         help='Generate sample recommendations'
     )
+    parser.add_argument(
+        '--models',
+        nargs='+',
+        choices=['user_cf', 'item_cf', 'svd', 'nmf', 'all'],
+        default=['all'],
+        help='Which models to train (default: all)'
+    )
 
     args = parser.parse_args()
 
     try:
+        # Check if specific models requested
+        if 'all' not in args.models:
+            # Filter MODEL_PARAMS to only requested models
+            original_params = MODEL_PARAMS.copy()
+            for model_key in list(MODEL_PARAMS.keys()):
+                if model_key.replace('_based_cf', '_cf') not in args.models:
+                    del MODEL_PARAMS[model_key]
+
         # Train models
         models, comparison_df = train_all_models(
             sample_size=args.sample_size,
@@ -247,16 +314,22 @@ def main():
         )
 
         # Generate sample recommendations if requested
-        if args.recommendations:
+        if args.recommendations and models:
             # Load user-item matrix
             data_loader = DataLoader()
             user_item_matrix = data_loader.load_processed_data("user_item_matrix")
-            generate_sample_recommendations(models, user_item_matrix)
+
+            if user_item_matrix is not None:
+                generate_sample_recommendations(models, user_item_matrix)
+            else:
+                logger.warning("Could not load user-item matrix for recommendations")
 
         logger.info("\n✅ All tasks completed successfully!")
 
     except Exception as e:
         logger.error(f"Error during training: {e}")
+        import traceback
+        traceback.print_exc()
         raise
 
 
